@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
+  const { prompt, systemPrompt } = await req.json();
+
   try {
-    const { prompt, systemPrompt } = await req.json();
-    
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -13,27 +13,26 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "moonshotai/kimi-k2.5",
         messages: [
-          {
-            role: "system",
-            content: systemPrompt || "You are a helpful assistant that generates conventional commit messages from voice descriptions.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
+          { role: "system", content: systemPrompt || "You are a helpful assistant." },
+          { role: "user", content: prompt },
         ],
         max_tokens: 2048,
         temperature: 0.7,
       }),
     });
 
+    if (\!response.ok) {
+      const errorText = await response.text();
+      return NextResponse.json({ result: "AI service error: " + response.status }, { status: 502 });
+    }
+
     const data = await response.json();
-    return NextResponse.json({
-      result: data.choices?.[0]?.message?.content || "No response",
-    });
+    const message = data.choices?.[0]?.message;
+    const result = message?.content || message?.reasoning_content || "No response";
+    return NextResponse.json({ result });
   } catch (error) {
     return NextResponse.json(
-      { result: "Error processing request" },
+      { result: "Failed to connect to AI service" },
       { status: 500 }
     );
   }
